@@ -4,7 +4,7 @@
 
 A survival analysis pipeline for credit default prediction using LendingClub's public loan dataset (2007–2018). The goal is to model time-to-default, not just binary default classification. Three models are built in sequence, each relaxing a different assumption from the previous one.
 
-This is a notebook-first project. The full-stack application comes later. All current code lives in `notebooks/`.
+This is a notebook-first project. The full-stack application comes later. All current code lives in `model_development/`.
 
 ---
 
@@ -38,7 +38,7 @@ Split is **temporal**, not random. This avoids data leakage and reflects real de
 
 ## Notebooks
 
-### 01_data_pipeline.ipynb
+### data_pipeline.ipynb
 - Downloads data via `kaggle.api`
 - Filters to usable loan statuses
 - Constructs `duration` and `event` columns
@@ -50,14 +50,14 @@ Split is **temporal**, not random. This avoids data leakage and reflects real de
 - Saves to parquet
 - Runs leakage assertion and duration sanity checks
 
-### 02_cox_ph.ipynb (complete)
+### cox_prop_hazard.ipynb (complete)
 Cox Proportional Hazards model. Interpretable baseline. Implemented using `lifelines`. Averages fico_range_low and fico_range_high into fico_score. Scales numeric features with StandardScaler. penalizer=0.1 for L2 regularization. Schoenfeld residual test run on a 10k sample (not full train — too slow). Evaluated with C-statistic and Brier Score at t=12,24,36 months.
 Results: val C-stat=0.6848, test C-stat=0.6931. Brier scores well below 0.25 across all horizons. This is the baseline target for the remaining two models to beat.
 
-### 03_discrete_hazard.ipynb (not yet written)
+### discrete_hazard.ipynb (not yet written)
 Discrete-time hazard model. Discretizes the time axis into monthly intervals. At each interval, trains a binary classifier for "did the borrower default in this interval given they survived until now?". Survival curve reconstructed as the product of per-interval survival probabilities. Most flexible model — no proportional hazards assumption.
 
-### 04_deepsurv.ipynb (not yet written)
+### deepsurv.ipynb (not yet written)
 DeepSurv neural network. Keeps Cox partial likelihood loss but replaces the linear predictor with a feedforward network. Implemented in PyTorch. Same evaluation harness as Cox.
 
 ---
