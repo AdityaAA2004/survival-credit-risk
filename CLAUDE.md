@@ -110,7 +110,7 @@ These rules are non-negotiable and apply to every file in this project:
 
 ## Current status
 
-01_data_pipeline.ipynb — complete
-02_cox_ph.ipynb — complete (baseline: C-stat 0.69, Brier 0.087 at t=36 on test)
-03_discrete_hazard.ipynb — next
-04_deepsurv.ipynb — after discrete hazard
+data_pipeline.ipynb — complete
+cox_prop_hazard.ipynb — complete (baseline: C-stat 0.69, Brier 0.087 at t=36 on test)
+discrete_hazard.ipynb — next
+deepsurv.ipynb — after discrete hazard
