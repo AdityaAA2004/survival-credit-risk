@@ -55,6 +55,66 @@ const DEFAULTS: FormValues = {
   home_ownership: "RENT", verification_status: "Source Verified",
 };
 
+const PRESETS: { name: string; detail: string; values: FormValues }[] = [
+  {
+    name: "Prime",
+    detail: "Lower leverage, cleaner bureau profile.",
+    values: {
+      loan_amnt: "8000",
+      term: "36",
+      int_rate: "8.7",
+      installment: "253",
+      purpose: "home_improvement",
+      grade: "A",
+      sub_grade: "A3",
+      emp_length: "9",
+      annual_inc: "110000",
+      dti: "11",
+      fico_range_low: "760",
+      fico_range_high: "764",
+      open_acc: "12",
+      pub_rec: "0",
+      revol_bal: "6200",
+      revol_util: "19",
+      total_acc: "31",
+      delinq_2yrs: "0",
+      home_ownership: "MORTGAGE",
+      verification_status: "Verified",
+    },
+  },
+  {
+    name: "Balanced",
+    detail: "Mid-tier credit with stable repayment capacity.",
+    values: DEFAULTS,
+  },
+  {
+    name: "Stressed",
+    detail: "Higher pricing, thinner cash flow, weaker history.",
+    values: {
+      loan_amnt: "22000",
+      term: "60",
+      int_rate: "23.4",
+      installment: "607",
+      purpose: "debt_consolidation",
+      grade: "E",
+      sub_grade: "E4",
+      emp_length: "2",
+      annual_inc: "42000",
+      dti: "29",
+      fico_range_low: "620",
+      fico_range_high: "624",
+      open_acc: "7",
+      pub_rec: "1",
+      revol_bal: "15400",
+      revol_util: "82",
+      total_acc: "14",
+      delinq_2yrs: "2",
+      home_ownership: "RENT",
+      verification_status: "Source Verified",
+    },
+  },
+];
+
 interface Props {
   featureCols: string[];
   onSubmit: (features: Record<string, number>) => void;
@@ -117,25 +177,30 @@ export default function BorrowerForm({ featureCols, onSubmit, loading }: Props) 
     onSubmit(ordered);
   }
 
-  const field = (label: string, key: keyof FormValues, type = "number") => (
-    <div className="flex flex-col gap-1">
-      <label className="text-xs text-gray-500">{label}</label>
+  const ficoMidpoint = Math.round((+values.fico_range_low + +values.fico_range_high) / 2);
+  const incomeToLoanRatio = (+values.annual_inc / Math.max(+values.loan_amnt, 1)).toFixed(1);
+
+  const field = (label: string, key: keyof FormValues, options?: { min?: number; step?: string }) => (
+    <div className="flex flex-col gap-2">
+      <label className="text-xs font-medium tracking-[0.02em] text-[var(--muted-strong)]">{label}</label>
       <input
-        type={type}
+        type="number"
         value={values[key]}
         onChange={(e) => set(key, e.target.value)}
-        className="border border-gray-200 rounded px-2 py-1 text-sm w-full"
+        min={options?.min}
+        step={options?.step ?? "any"}
+        className="form-field text-sm"
       />
     </div>
   );
 
   const select = (label: string, key: keyof FormValues, options: string[]) => (
-    <div className="flex flex-col gap-1">
-      <label className="text-xs text-gray-500">{label}</label>
+    <div className="flex flex-col gap-2">
+      <label className="text-xs font-medium tracking-[0.02em] text-[var(--muted-strong)]">{label}</label>
       <select
         value={values[key]}
         onChange={(e) => set(key, e.target.value)}
-        className="border border-gray-200 rounded px-2 py-1 text-sm w-full bg-white"
+        className="form-field text-sm"
       >
         {options.map((o) => <option key={o} value={o}>{o}</option>)}
       </select>
@@ -143,46 +208,97 @@ export default function BorrowerForm({ featureCols, onSubmit, loading }: Props) 
   );
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6">
+    <form onSubmit={handleSubmit} className="space-y-8">
+      <section className="space-y-4">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <p className="editorial-kicker text-[10px]">Scenario presets</p>
+            <p className="mt-2 text-sm leading-6 text-[var(--ink-soft)]">
+              Start with a plausible borrower profile, then tune the details.
+            </p>
+          </div>
+        </div>
+        <div className="grid gap-3 md:grid-cols-3">
+          {PRESETS.map((preset) => (
+            <button
+              key={preset.name}
+              type="button"
+              onClick={() => setValues(preset.values)}
+              className="rounded-[0.85rem] border border-[var(--surface-border)] bg-[#f8fafc] p-4 text-left transition-colors duration-150 hover:bg-[#f1f5f9]"
+            >
+              <p className="text-sm font-semibold tracking-[-0.02em] text-[var(--foreground)]">{preset.name}</p>
+              <p className="mt-2 text-sm leading-5 text-[var(--ink-soft)]">{preset.detail}</p>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="stat-pill rounded-[0.85rem] p-4">
+          <p className="soft-caption text-[10px]">FICO midpoint</p>
+          <p className="mt-2 text-xl font-semibold tracking-[-0.03em]">{ficoMidpoint}</p>
+        </div>
+        <div className="stat-pill rounded-[0.85rem] p-4">
+          <p className="soft-caption text-[10px]">Debt-to-income</p>
+          <p className="mt-2 text-xl font-semibold tracking-[-0.03em]">{values.dti}%</p>
+        </div>
+        <div className="stat-pill rounded-[0.85rem] p-4">
+          <p className="soft-caption text-[10px]">Revolving use</p>
+          <p className="mt-2 text-xl font-semibold tracking-[-0.03em]">{values.revol_util}%</p>
+        </div>
+        <div className="stat-pill rounded-[0.85rem] p-4">
+          <p className="soft-caption text-[10px]">Income / loan</p>
+          <p className="mt-2 text-xl font-semibold tracking-[-0.03em]">{incomeToLoanRatio}x</p>
+        </div>
+      </section>
+
       <section>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Loan</h3>
-        <div className="grid grid-cols-2 gap-3">
-          {field("Amount ($)", "loan_amnt")}
+        <div className="mb-3">
+          <p className="editorial-kicker text-[10px]">Loan structure</p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          {field("Amount ($)", "loan_amnt", { min: 0 })}
           {select("Term (months)", "term", ["36", "60"])}
-          {field("Interest rate (%)", "int_rate")}
-          {field("Installment ($)", "installment")}
+          {field("Interest rate (%)", "int_rate", { min: 0 })}
+          {field("Installment ($)", "installment", { min: 0 })}
           {select("Purpose", "purpose", PURPOSES)}
         </div>
       </section>
 
       <section>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Borrower</h3>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="mb-3">
+          <p className="editorial-kicker text-[10px]">Borrower profile</p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
           {select("Grade", "grade", Object.keys(GRADE_MAP))}
           {select("Sub-grade", "sub_grade", Object.keys(SUB_GRADE_MAP))}
-          {field("Employment length (years)", "emp_length")}
-          {field("Annual income ($)", "annual_inc")}
-          {field("DTI", "dti")}
+          {field("Employment length (years)", "emp_length", { min: 0, step: "1" })}
+          {field("Annual income ($)", "annual_inc", { min: 0 })}
+          {field("DTI", "dti", { min: 0 })}
         </div>
       </section>
 
       <section>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Credit history</h3>
-        <div className="grid grid-cols-2 gap-3">
-          {field("FICO low", "fico_range_low")}
-          {field("FICO high", "fico_range_high")}
-          {field("Open accounts", "open_acc")}
-          {field("Public records", "pub_rec")}
-          {field("Revolving balance ($)", "revol_bal")}
-          {field("Revolving utilization (%)", "revol_util")}
-          {field("Total accounts", "total_acc")}
-          {field("Delinquencies (2yr)", "delinq_2yrs")}
+        <div className="mb-3">
+          <p className="editorial-kicker text-[10px]">Credit history</p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
+          {field("FICO low", "fico_range_low", { min: 0, step: "1" })}
+          {field("FICO high", "fico_range_high", { min: 0, step: "1" })}
+          {field("Open accounts", "open_acc", { min: 0, step: "1" })}
+          {field("Public records", "pub_rec", { min: 0, step: "1" })}
+          {field("Revolving balance ($)", "revol_bal", { min: 0 })}
+          {field("Revolving utilization (%)", "revol_util", { min: 0 })}
+          {field("Total accounts", "total_acc", { min: 0, step: "1" })}
+          {field("Delinquencies (2yr)", "delinq_2yrs", { min: 0, step: "1" })}
         </div>
       </section>
 
       <section>
-        <h3 className="text-xs font-semibold uppercase tracking-wide text-gray-400 mb-3">Housing & verification</h3>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="mb-3">
+          <p className="editorial-kicker text-[10px]">Verification context</p>
+        </div>
+        <div className="grid gap-4 md:grid-cols-2">
           {select("Home ownership", "home_ownership", HOME_OWNERSHIPS)}
           {select("Verification status", "verification_status", VERIFICATION_STATUSES)}
         </div>
@@ -191,9 +307,9 @@ export default function BorrowerForm({ featureCols, onSubmit, loading }: Props) 
       <button
         type="submit"
         disabled={loading}
-        className="w-full bg-gray-900 text-white rounded py-2 text-sm font-medium hover:bg-gray-700 disabled:opacity-50 transition-colors"
+        className="w-full rounded-[0.85rem] bg-[var(--accent)] px-4 py-3.5 text-sm font-semibold tracking-[0.02em] text-white transition-colors duration-150 hover:bg-[#1c4f8e] disabled:cursor-not-allowed disabled:opacity-50"
       >
-        {loading ? "Predicting..." : "Predict survival"}
+        {loading ? "Scoring borrower..." : "Run survival forecast"}
       </button>
     </form>
   );
