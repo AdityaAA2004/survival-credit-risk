@@ -14,11 +14,11 @@ Survival models handle censored observations correctly. The output is a probabil
 
 ## Results
 
-| Model | Val C-stat | Test C-stat | Brier t=12 | Brier t=24 | Brier t=36 |
+| Model | Val C-stat | Test C-stat | Val Brier t=12 | Val Brier t=24 | Val Brier t=36 |
 |---|---|---|---|---|---|
 | Cox PH (baseline) | 0.6848 | 0.6931 | 0.0552 | 0.1093 | 0.1346 |
-| Discrete-Time Hazard | 0.6850 | 0.6921 | 0.0625 | 0.1512 | 0.3064 |
-| DeepSurv | — | — | — | — | — |
+| Discrete-Time Hazard | 0.6850 | 0.6921 | 0.0549 | 0.1092 | 0.1340 |
+| DeepSurv | 0.6916 | 0.7015 | 0.0549 | 0.1083 | 0.1341 |
 
 C-statistic measures ranking ability (analogous to AUC). Brier score measures calibration — lower is better, with 0.25 as the naive baseline.
 
@@ -32,7 +32,7 @@ Three models are built in sequence, each relaxing a different assumption:
 
 **2. Discrete-Time Hazard** — breaks the timeline into monthly intervals, fits a logistic regression at each interval for "did this borrower default *this month*, given they survived until now?". Survival curve is the product of per-interval survival probabilities. No proportional hazards assumption.
 
-**3. DeepSurv** *(in progress)* — keeps the Cox partial likelihood loss but replaces the linear predictor with a feedforward neural network. Implemented in PyTorch.
+**3. DeepSurv** — keeps the Cox partial likelihood loss but replaces the linear predictor with a feedforward neural network. Implemented in PyTorch. Best test C-statistic of the three models (0.7015).
 
 ---
 
@@ -55,10 +55,34 @@ model_development/
   data_pipeline.ipynb       # download, clean, feature engineering, temporal split
   cox_prop_hazard.ipynb     # Cox PH model — complete
   discrete_hazard.ipynb     # discrete-time hazard model — complete
-  deepsurv.ipynb            # DeepSurv neural network — in progress
+  deepsurv.ipynb            # DeepSurv neural network — complete
   outputs/                  # saved plots
+artifacts/                  # model artifacts for serving (ONNX models, scalers, coefficients)
+backend/                    # Spring Boot 4.0.6 REST API (Java 26, ONNX Runtime)
+frontend/                   # Next.js 16.2.7 UI (React 19, TypeScript)
 data/                       # gitignored — parquet splits live here
 ```
+
+---
+
+## Running the Application
+
+**Backend** (serves predictions from all three models):
+```bash
+cd backend
+mvn spring-boot:run
+# API available at http://localhost:8080/api
+```
+
+**Frontend**:
+```bash
+cd frontend
+npm install
+npm run dev
+# UI available at http://localhost:3000
+```
+
+The backend loads model artifacts from `../artifacts` at startup. The frontend dynamically fetches feature columns from the API and submits borrower inputs to `/api/predict`, which returns survival curves from all three models concurrently.
 
 ---
 

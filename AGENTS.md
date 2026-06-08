@@ -4,7 +4,7 @@
 
 A survival analysis pipeline for credit default prediction using LendingClub's public loan dataset (2007–2018). The goal is to model time-to-default, not just binary default classification. Three models are built in sequence, each relaxing a different assumption from the previous one.
 
-This is a notebook-first project. The full-stack application comes later. All current code lives in `model_development/`.
+The notebook pipeline lives in `model_development/`. A full-stack serving application (Spring Boot backend + Next.js frontend) is built and running alongside it.
 
 ---
 
@@ -54,11 +54,13 @@ Split is **temporal**, not random. This avoids data leakage and reflects real de
 Cox Proportional Hazards model. Interpretable baseline. Implemented using `lifelines`. Averages fico_range_low and fico_range_high into fico_score. Scales numeric features with StandardScaler. penalizer=0.1 for L2 regularization. Schoenfeld residual test run on a 10k sample (not full train — too slow). Evaluated with C-statistic and Brier Score at t=12,24,36 months.
 Results: val C-stat=0.6848, test C-stat=0.6931. Brier scores well below 0.25 across all horizons. This is the baseline target for the remaining two models to beat.
 
-### discrete_hazard.ipynb (not yet written)
-Discrete-time hazard model. Discretizes the time axis into monthly intervals. At each interval, trains a binary classifier for "did the borrower default in this interval given they survived until now?". Survival curve reconstructed as the product of per-interval survival probabilities. Most flexible model — no proportional hazards assumption.
+### discrete_hazard.ipynb (complete)
+Discrete-time hazard model. Person-period expansion converts each borrower into T monthly rows. LogisticRegression trained on expanded set (~12.5M rows). Survival curve is the product of per-interval survival probabilities. No proportional hazards assumption. Exported to ONNX for serving.
+Results: val C-stat=0.6850, test C-stat=0.6921. Val Brier: 0.0549/0.1092/0.1340 at t=12/24/36.
 
-### deepsurv.ipynb (not yet written)
-DeepSurv neural network. Keeps Cox partial likelihood loss but replaces the linear predictor with a feedforward network. Implemented in PyTorch. Same evaluation harness as Cox.
+### deepsurv.ipynb (complete)
+DeepSurv neural network. Feedforward network trained with Cox partial likelihood loss. Implemented in PyTorch. Same evaluation harness as Cox. Exported to ONNX for serving.
+Results: val C-stat=0.6916, test C-stat=0.7015. Val Brier: 0.0549/0.1083/0.1341 at t=12/24/36. Best test C-statistic of the three models.
 
 ---
 
@@ -67,9 +69,11 @@ DeepSurv neural network. Keeps Cox partial likelihood loss but replaces the line
 ```
 loan_amnt, int_rate, installment, grade, sub_grade, emp_length,
 home_ownership, annual_inc, verification_status, purpose, dti,
-delinq_2yrs, fico_range_low, fico_range_high, open_acc, pub_rec,
+delinq_2yrs, fico_score, open_acc, pub_rec,
 revol_bal, revol_util, total_acc, term
 ```
+
+`fico_score` is the average of `fico_range_low` and `fico_range_high`, computed during pipeline.
 
 Leakage columns (never include): recoveries, total_pymnt, out_prncp, collection_*, last_pymnt_*
 
@@ -108,9 +112,45 @@ These rules are non-negotiable and apply to every file in this project:
 
 ---
 
+## Backend (Spring Boot)
+
+Spring Boot 4.0.6, Java 26. Package: `com.survivalrisk`. Runs on port 8080.
+
+Artifacts loaded at startup from `../artifacts/`:
+- `cox_ph_coef.json`, `cox_ph_baseline.json`, `cox_scaler.json` — Cox PH (analytical inference)
+- `discrete_hazard.onnx`, `discrete_scaler.json` — discrete hazard (ONNX)
+- `deepsurv.onnx`, `deepsurv_H0.json`, `deepsurv_scaler.json` — DeepSurv (ONNX)
+- `feature_cols.json` — canonical column order
+
+REST API:
+- `GET /api/features` — returns feature column list in model order
+- `POST /api/predict` — accepts `BorrowerInput` JSON, returns survival curves from all three models concurrently via `StructuredTaskScope`
+
+Run: `cd backend && mvn spring-boot:run`
+
+---
+
+## Frontend (Next.js)
+
+Next.js 16.2.7, React 19.2.4, TypeScript. Runs on port 3000.
+
+API base: `http://localhost:8080/api` (configurable via `NEXT_PUBLIC_API_BASE_URL`).
+
+Components:
+- `RiskWorkbench` — main layout: header stats, model stack, form + results
+- `BorrowerForm` — dynamically renders fields in the order returned by `GET /api/features`
+- `ResultsPanel` — displays per-horizon default probabilities and cross-model comparison
+- `SurvivalChart` — survival curve chart across all three models
+
+Run: `cd frontend && npm run dev`
+
+---
+
 ## Current status
 
 data_pipeline.ipynb — complete
-cox_prop_hazard.ipynb — complete (baseline: C-stat 0.69, Brier 0.087 at t=36 on test)
-discrete_hazard.ipynb — next
-deepsurv.ipynb — after discrete hazard
+cox_prop_hazard.ipynb — complete (val C-stat 0.6848, test C-stat 0.6931, test Brier 0.0865 at t=36)
+discrete_hazard.ipynb — complete (val C-stat 0.6850, test C-stat 0.6921, test Brier 0.0868 at t=36)
+deepsurv.ipynb — complete (val C-stat 0.6916, test C-stat 0.7015, test Brier 0.0875 at t=36)
+backend — complete (Spring Boot 4.0.6, ONNX serving, concurrent inference)
+frontend — complete (Next.js 16.2.7, borrower input form, survival curve visualization)
